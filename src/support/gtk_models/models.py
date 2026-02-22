@@ -12,3 +12,10 @@ from .management import gtk_data_model
 #     is_dirty = GObject.Property(type=bool, default=False)
 
 ProductModel = gtk_data_model(models.Product)
+
+class OrderModel(gtk_data_model(models.Order)):
+    @GObject.Property
+    def product_name(self) -> str:
+        "Read only property."
+        sql_obj = self.to_sql_object()
+        return sql_obj.product.name
