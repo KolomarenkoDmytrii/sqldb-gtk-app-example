@@ -2,7 +2,7 @@ from typing import Callable
 import sys
 
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 
 import gi
 
@@ -12,12 +12,12 @@ from gi.repository import Gtk
 from support import models
 from support.gtk_models.models import ProductModel, OrderModel
 from support.gtk_models.management import DataRepository
-from support.widgets import DatabaseTableWidget
+from support.widgets.db_table import DatabaseTableWidget
 
 
 class MainWindow(Gtk.ApplicationWindow):
     def __init__(self, repository: DataRepository, **kargs):
-        super().__init__(**kargs, title="Lab 5")
+        super().__init__(**kargs, title="Product Management")
         # box = Gtk.Box(spacing=4, orientation=Gtk.Orientation.VERTICAL)
         notebook = Gtk.Notebook()
         products_table = DatabaseTableWidget(models.Product, ProductModel, repository)
@@ -45,6 +45,12 @@ class App(Gtk.Application):
 if __name__ == "__main__":
     # engine = create_engine("sqlite:///:memory:")
     engine = create_engine("sqlite:///data/data.db")
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     models.Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)
     data_repository = DataRepository(session)

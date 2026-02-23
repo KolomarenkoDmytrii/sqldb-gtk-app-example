@@ -5,8 +5,8 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gio, GObject
 
-from .gtk_models.management import T_GTK, T_SQL, DataRepository, GtkDataModelProtocol
-from .gtk_models.models_store import ManagedListStore
+from ..gtk_models.management import T_GTK, T_SQL, DataRepository, GtkDataModelProtocol
+from ..gtk_models.models_store import ManagedListStore
 
 
 class DatabaseTableWidget(Gtk.Box):
