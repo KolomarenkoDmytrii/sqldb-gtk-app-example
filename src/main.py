@@ -1,4 +1,3 @@
-from typing import Callable
 import sys
 
 from sqlalchemy.orm import sessionmaker, Session
@@ -9,24 +8,27 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk
 
-from support import models
-from support.gtk_models.models import ProductModel, OrderModel
+from support.widgets.main_window import MainWindow
+from support.models import Base
+# from support.gtk_models.models import ProductModel, OrderModel
 from support.gtk_models.management import DataRepository
-from support.widgets.db_table import DatabaseTableWidget
+# from support.widgets.db_table import DatabaseTableWidget
+# from support.widgets.summary import SummaryWidget
 
 
-class MainWindow(Gtk.ApplicationWindow):
-    def __init__(self, repository: DataRepository, **kargs):
-        super().__init__(**kargs, title="Product Management")
-        # box = Gtk.Box(spacing=4, orientation=Gtk.Orientation.VERTICAL)
-        notebook = Gtk.Notebook()
-        products_table = DatabaseTableWidget(models.Product, ProductModel, repository)
-        orders_table = DatabaseTableWidget(models.Order, OrderModel, repository)
-        notebook.append_page(products_table, Gtk.Label.new("Products"))
-        notebook.append_page(orders_table, Gtk.Label.new("Orders"))
-        # box.append(table)
-        # self.set_child(box)
-        self.set_child(notebook)
+# class MainWindow(Gtk.ApplicationWindow):
+#     def __init__(self, repository: DataRepository, **kargs):
+#         super().__init__(**kargs, title="Product Management")
+#         notebook = Gtk.Notebook()
+#         products_table = DatabaseTableWidget(models.Product, ProductModel, repository)
+#         orders_table = DatabaseTableWidget(models.Order, OrderModel, repository)
+        
+#         summary = SummaryWidget(products_table.list_store, repository)
+
+#         notebook.append_page(products_table, Gtk.Label.new("Products"))
+#         notebook.append_page(orders_table, Gtk.Label.new("Orders"))
+#         notebook.append_page(summary, Gtk.Label.new("Lefts"))
+#         self.set_child(notebook)
 
 
 class App(Gtk.Application):
@@ -51,7 +53,7 @@ if __name__ == "__main__":
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
 
-    models.Base.metadata.create_all(engine)
+    Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)
     data_repository = DataRepository(session)
 

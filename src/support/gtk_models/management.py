@@ -34,8 +34,12 @@ class GtkDataModelProtocol(Protocol):
     def to_sql_object(self) -> Any: ...
     @classmethod
     def from_sql_object(cls: type[T_GTK], sql_obj: Any) -> T_GTK: ...
+
     def get_property(self, property_name: str) -> Any: ...
     def set_property(self, property_name: str, value: Any) -> None: ...
+
+    @classmethod
+    def find_property(self, property_name: str) -> Any: ...
 
 
 class TypeMapper:
@@ -56,7 +60,7 @@ class TypeMapper:
         return None
 
 
-def gtk_data_model(sql_cls: type[T_SQL]) -> type[Any]:
+def gtk_data_model(sql_cls: type[T_SQL]) -> type[GtkDataModelProtocol]:
     props: dict[str, GObject.Property] = {}
     fk_metadata: dict[str, Any] = {}  # Store which columns are FKs
 
@@ -167,9 +171,10 @@ class DataRepository:
                 for pk in mapper.primary_key:
                     setattr(gtk_model, pk.name, getattr(merged_obj, pk.name))
 
-            if gtk_models:
-                # Notify that this specific type has changed
-                self._notify_changes(type(gtk_models[0].to_sql_object()))
+            # if gtk_models:
+            #     # Notify that this specific type has changed
+            #     self._notify_changes(type(gtk_models[0].to_sql_object()))
+            self._notify_changes(type(gtk_models[0].to_sql_object()))
 
     def delete(self, gtk_models: Sequence[T_GTK]) -> None:
         with self.session_factory() as session:
@@ -198,10 +203,11 @@ class DataRepository:
 
             session.commit()
 
-        if gtk_models:
-            # Notify that this specific type has changed
-            # This assumes all T_GTK objects are related to one SQL class
-            self._notify_changes(type(gtk_models[0].to_sql_object()))
+        # if gtk_models:
+        #     # Notify that this specific type has changed
+        #     # This assumes all T_GTK objects are related to one SQL class
+        #     self._notify_changes(type(gtk_models[0].to_sql_object()))
+        self._notify_changes(type(gtk_models[0].to_sql_object()))
 
     # gtk_model_cls: type[T_GTK] ?
     def fetch_all(

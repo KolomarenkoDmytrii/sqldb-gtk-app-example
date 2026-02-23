@@ -8,10 +8,11 @@ class Base(orm.DeclarativeBase):
 class Product(Base):
     __tablename__ = "products"
     id: orm.Mapped[int] = orm.mapped_column(primary_key=True)
-    name: orm.Mapped[str] = orm.mapped_column(String(40))
+    # this property 'name' needed for dropdown 
+    name: orm.Mapped[str] = orm.mapped_column(String(40)) 
     description: orm.Mapped[str] = orm.mapped_column(String(300))
     quantity: orm.Mapped[int] = orm.mapped_column(Integer())
-    oreders: orm.Mapped[list["Order"]] = orm.relationship(cascade="all,delete")
+    orders: orm.Mapped[list["Order"]] = orm.relationship(cascade="all,delete")
 
 
 class Order(Base):
