@@ -57,7 +57,9 @@ class TypeMapper:
 
 
 def gtk_data_model(sql_cls: type[T_SQL]) -> type[Any]:
-    props: Dict[str, GObject.Property] = {}
+    props: dict[str, GObject.Property] = {}
+    fk_metadata: dict[str, Any] = {}  # Store which columns are FKs
+
     # Iterate over SQLAlchemy's mapper to find columns reliably
     mapper: orm.Mapper = orm.class_mapper(sql_cls)
     for column in mapper.columns:
@@ -69,12 +71,29 @@ def gtk_data_model(sql_cls: type[T_SQL]) -> type[Any]:
             # We define the property name to match the SQL column key
             props[column.key] = GObject.Property(type=py_type)
 
+            # Check for Foreign Keys
+            if column.foreign_keys:
+                # 1. Get the target table name
+                fk = list(column.foreign_keys)[0]
+                target_table = fk.column.table
+
+                # 2. Find the class associated with this table in the registry
+                for mapper_val in sql_cls.registry.mappers:
+                    if mapper_val.local_table == target_table:
+                        fk_metadata[prop_name] = mapper_val.class_
+                        print(fk_metadata[prop_name])
+                        # break
+
     # Logic fix: We use GObject.GObject as the static base for Mypy's sake
     # but create the dynamic type for GTK's sake.
-    DynamicGtkModel: type = type(sql_cls.__name__ + "GtkBase", (GObject.GObject,), props)
+    DynamicGtkModel: type = type(
+        sql_cls.__name__ + "GtkBase", (GObject.GObject,), props
+    )
 
-    class GtkDataModel(DynamicGtkModel):  
-        is_deleted = GObject.Property(type=bool, default=False)
+    class GtkDataModel(DynamicGtkModel):
+        _sql_cls = sql_cls
+        _fk_configs = fk_metadata
+        # is_deleted = GObject.Property(type=bool, default=False)
 
         # class GtkDataModel(cast(type[GObject.GObject], DynamicGtkModel)):
         def __init__(self, **kwargs: Any) -> None:
@@ -108,7 +127,7 @@ def gtk_data_model(sql_cls: type[T_SQL]) -> type[Any]:
                     val = None
                 data[c.key] = val
 
-            return sql_cls(**data)
+            return self._sql_cls(**data)
 
     return GtkDataModel
 
@@ -119,6 +138,15 @@ class DataRepository:
 
     def __init__(self, session_factory: Callable[[], orm.Session]) -> None:
         self.session_factory = session_factory
+        # List of callbacks to run after any save/delete
+        self._on_change_callbacks: list[Callable[[type], None]] = []
+
+    def subscribe_to_changes(self, callback: Callable[[type], None]):
+        self._on_change_callbacks.append(callback)
+
+    def _notify_changes(self, sql_cls: type):
+        for callback in self._on_change_callbacks:
+            callback(sql_cls)
 
     def save(self, gtk_models: Sequence[T_GTK]) -> None:
         """Syncs a model implementing GtkDataModelProtocol to the database."""
@@ -138,6 +166,10 @@ class DataRepository:
             for gtk_model, merged_obj in zip(gtk_models, merged_objs):
                 for pk in mapper.primary_key:
                     setattr(gtk_model, pk.name, getattr(merged_obj, pk.name))
+
+            if gtk_models:
+                # Notify that this specific type has changed
+                self._notify_changes(type(gtk_models[0].to_sql_object()))
 
     def delete(self, gtk_models: Sequence[T_GTK]) -> None:
         with self.session_factory() as session:
@@ -166,6 +198,11 @@ class DataRepository:
 
             session.commit()
 
+        if gtk_models:
+            # Notify that this specific type has changed
+            # This assumes all T_GTK objects are related to one SQL class
+            self._notify_changes(type(gtk_models[0].to_sql_object()))
+
     # gtk_model_cls: type[T_GTK] ?
     def fetch_all(
         self, sql_cls: type[T_SQL], gtk_model_cls: type[T_GTK]
@@ -181,3 +218,13 @@ class DataRepository:
             #     for obj in results
             # ]
             return [gtk_model_cls.from_sql_object(obj) for obj in results]
+
+    # # def fetch_all_raw_sql_by_table_name(self, table_name: str) -> List[Any]:
+    # def fetch_all_raw_sql_by_table_name(self, sql_cls: type[T_SQL]) -> List[Any]:
+    #     # # A generic way to fetch rows from a target table for a dropdown
+    #     # # In a real app, you might map table names to classes.
+    #     # from . import models
+    #     # table_to_cls = {"products": models.Product, "orders": models.Order}
+
+    #     with self.session_factory() as session:
+    #         return session.scalars(select(table_to_cls[table_name])).all()

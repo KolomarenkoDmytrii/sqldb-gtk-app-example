@@ -43,8 +43,8 @@ class App(Gtk.Application):
 
 
 if __name__ == "__main__":
-    engine = create_engine("sqlite:///:memory:")
-    # engine = create_engine("sqlite:///data/data.db")
+    # engine = create_engine("sqlite:///:memory:")
+    engine = create_engine("sqlite:///data/data.db")
     models.Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)
     data_repository = DataRepository(session)
