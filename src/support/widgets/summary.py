@@ -1,26 +1,40 @@
+# pylint: disable=wrong-import-position
+"""A module that contains widget for the products lefts summary."""
+
 from sqlalchemy import func, select
 
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk, Gio, GObject
+from gi.repository import Gtk
 
-from ..gtk_models.management import DataRepository, T_SQL, T_GTK, GtkDataModelProtocol
+from ..gtk_models.management import DataRepository, SqlT
 from ..gtk_models.models_store import ManagedListStore
 from ..gtk_models.models import ProductModel
 from ..models import Order
 
 
 class SummaryWidget(Gtk.Box):
-    def __init__(self, models_store: ManagedListStore, repository: DataRepository):
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=10, hexpand=True)
+    """Widget with the lefts info for every product."""
+
+    def __init__(
+        self, models_store: ManagedListStore, repository: DataRepository
+    ) -> None:
+        """Create a SummaryWidget object.
+
+        Args:
+            models_store (ManagedListStore): A `ManagedListStore` for `ProductModel` view models.
+            repository (DataRepository): A data repository which is used for data retrieval.
+        """
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=10, vexpand=True)
 
         self.models_store = models_store
         self.repository = repository
 
         if self.models_store.item_type != ProductModel:
             raise ValueError(
-                f"models_store must contain ProductModel objects, given {models_store.item_type.__name__}"
+                "models_store must contain ProductModel objects, "
+                + f"given {models_store.item_type.__name__}"
             )
 
         self._product_lefts_list = Gtk.ListBox()
@@ -30,24 +44,39 @@ class SummaryWidget(Gtk.Box):
 
         self.append(self._product_lefts_list)
 
-        # SUBSCRIBE to changes: 
-        # Whenever ANY table changes (Products OR Orders), we must refresh these labels.
+        # subscribe to changes:
+        # whenever any table changes (Products or Orders), labels must be refreshed
         self.repository.subscribe_to_changes(self._on_data_changed)
 
-    def _on_data_changed(self, changed_sql_cls: type[T_SQL]):
-        # We don't care which table changed; both affect the calculation
-        # invalidate_filter() or simply notifying the store 
-        # forces the 'create_widget_func' to run again for all rows.
-        self.models_store.items_changed(0, self.models_store.get_n_items(), self.models_store.get_n_items())
+    def _on_data_changed(self, _changed_sql_cls: type[SqlT]) -> None:
+        """Handle changes in tables and update labels correspondingly.
 
-    def _create_label(self, gtk_model: GtkDataModelProtocol) -> Gtk.Label:
+        Args:
+            _changed_sql_cls (type[SqlT]): dummy parameter.
+        """
+        # emit 'items-changed' signal if any table is updated
+        self.models_store.items_changed(
+            0, self.models_store.get_n_items(), self.models_store.get_n_items()
+        )
+
+    def _create_label(self, gtk_model: ProductModel) -> Gtk.Label:
+        """Create label for the product lefts info.
+
+        Args:
+            gtk_model (ProductModel): A view model of the product which info
+                about lefts will be displayed.
+
+        Returns:
+            Gtk.Label: A label with the product lefts info.
+        """
         product = gtk_model.to_sql_object()
-        # orders_total = sum(order.quantity for order in obj.orders) # not works
-        # Manually calculate sum from DB to ensure accuracy 
+        # manually calculate sum from DB to ensure accuracy
         # (avoiding stale lazy-loaded 'obj.orders' collections)
         with self.repository.session_factory() as session:
             # Query the sum of quantities for this product
-            stmt = select(func.sum(Order.quantity)).where(Order.product_id == product.id)
+            stmt = select(func.sum(Order.quantity)).where(
+                Order.product_id == product.id
+            )
             orders_total = session.scalar(stmt) or 0
 
         lefts = product.quantity - orders_total

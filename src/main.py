@@ -1,6 +1,10 @@
-import sys
+# pylint: disable=wrong-import-position
+"""The application entrypoint."""
 
-from sqlalchemy.orm import sessionmaker, Session
+import sys
+from typing import Any, Self
+
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, event
 
 import gi
@@ -10,45 +14,44 @@ from gi.repository import Gtk
 
 from support.widgets.main_window import MainWindow
 from support.models import Base
-# from support.gtk_models.models import ProductModel, OrderModel
 from support.gtk_models.management import DataRepository
-# from support.widgets.db_table import DatabaseTableWidget
-# from support.widgets.summary import SummaryWidget
-
-
-# class MainWindow(Gtk.ApplicationWindow):
-#     def __init__(self, repository: DataRepository, **kargs):
-#         super().__init__(**kargs, title="Product Management")
-#         notebook = Gtk.Notebook()
-#         products_table = DatabaseTableWidget(models.Product, ProductModel, repository)
-#         orders_table = DatabaseTableWidget(models.Order, OrderModel, repository)
-        
-#         summary = SummaryWidget(products_table.list_store, repository)
-
-#         notebook.append_page(products_table, Gtk.Label.new("Products"))
-#         notebook.append_page(orders_table, Gtk.Label.new("Orders"))
-#         notebook.append_page(summary, Gtk.Label.new("Lefts"))
-#         self.set_child(notebook)
 
 
 class App(Gtk.Application):
-    def __init__(self, repository: DataRepository, **kwargs):
+    """Class of the application."""
+
+    def __init__(self, repository: DataRepository, **kwargs: Any) -> None:
+        """Create a MainWindow object.
+
+        Args:
+            repository (DataRepository): A data repository for data syncronization and retrieval.
+            **kwargs (Any): Additional arguments for `Gtk.Application`.
+        """
         super().__init__(**kwargs)
         self.connect("activate", self.on_activate)
         self.repository = repository
+        self.main_window: MainWindow | None = None
 
-    # Метод який вказує, що виконати при активації застосунку
-    def on_activate(self, app):
+    def on_activate(self, app: Self) -> None:
+        """Setup the application.
+
+        Args:
+            app (Self): The `App` object; not used.
+        """
         self.main_window = MainWindow(repository=self.repository, application=app)
-        self.main_window.set_default_size(900, 450)
+        self.main_window.set_default_size(1000, 700)
         self.main_window.present()
 
 
 if __name__ == "__main__":
+    # uncomment if data persistence is not needed
     # engine = create_engine("sqlite:///:memory:")
     engine = create_engine("sqlite:///data/data.db")
+
+    # SQLite by default seems doesn't use cascade deletion, so force it
     @event.listens_for(engine, "connect")
-    def set_sqlite_pragma(dbapi_connection, connection_record):
+    def set_sqlite_pragma(dbapi_connection, _connection_record):
+        """Force SQLite to use cascade deletion.""" 
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
@@ -57,5 +60,5 @@ if __name__ == "__main__":
     session = sessionmaker(bind=engine)
     data_repository = DataRepository(session)
 
-    app = App(repository=data_repository, application_id="org.swarch.Lab5")
-    app.run(sys.argv)
+    application = App(repository=data_repository, application_id="org.swarch.Lab5")
+    application.run(sys.argv)

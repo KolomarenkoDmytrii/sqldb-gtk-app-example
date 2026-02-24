@@ -2,3 +2,4 @@ PyGObject
 PyGObject-stubs
 SQLAlchemy
 mypy
+pylint
